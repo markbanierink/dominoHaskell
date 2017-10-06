@@ -57,11 +57,11 @@ interleave x (y:ys) = y : x : interleave x ys
 
 
 
-posses :: Grid -> [Pos]
-posses g = concat [positions (transpose g) 1, positions g (width g)]
+locsBones :: Grid -> [Pos]
+locsBones g = concat [locations (transpose g) 1, locations g (width g)]
 
-allBones :: Grid -> [Bone]
-allBones g = concat [map orderBone (zips (transpose g)), map orderBone (zips g)]
+possBones :: Grid -> [Bone]
+possBones g = concat [map orderBone (zips (transpose g)), map orderBone (zips g)]
 
 -- create bone for each horizontal neighbour
 zips :: Grid -> [Bone]
@@ -80,19 +80,28 @@ orderBone (b1, b2) | b1 <= b2  = (b1, b2)
 width :: Grid -> Int
 width g = length (head g)
 
-positions :: Grid -> Int -> [Pos]
-positions g p2start = zip p1 p2
+locations :: Grid -> Int -> [Pos]
+locations g p2start = zip p1 p2
                             where
                                 p1 = [0..((width g) * (length g - 1))-1]
                                 p2 = [p2start..]
 
 
-                                
--- elemIndices (_,_,(0,0)) (possBones startGrid)
+
+
+-- elemIndices (0,0) (allBones startGrid)
 -- determine the number of a bone           ORDERING MIGHT BE DONE OUTSIDE
 boneNum :: Bone -> Int
-boneNum (b1, b2) | b1 <= b2  = sum [maxBone+1-b1..maxBone] + b2 + 1
-                 | otherwise = boneNum (b2, b1)
+boneNum (b1, b2) = sum [maxBone+1-b1..maxBone] + b2 + 1
 
+-- lists the number of occurences with the indices of occurence of all possible bones
+numOccurr :: [Bone] -> [(Int, [Int])]
+numOccurr possBones = zip nums (occurences possBones)
+                      where
+                        nums = [length n | n <- (occurences possBones)]
+
+occurences :: [Bone] -> [[Int]]
+occurences possBones = [elemIndices u possBones | u <- nub possBones]                     
+-- [(0,0),(0,3),(0,2),(1,4),(3,4),(6,4),(0,3),(0,2),(1,4)]
 -- startBones :: [Bone]
 -- startBones = zip [1..] (zip b1 b2)
