@@ -2,6 +2,7 @@
 import Data.Char
 import Data.List
 import System.IO
+import Data.Ord
 
 -- type Pos = (Int, Int)
 
@@ -19,8 +20,8 @@ type Grid = [[Int]]
 -- defining a Bone as a tuple of two Ints
 type Bone = (Int, Int)
 
--- defining a possible possition as a tuple with two positions (Int, Int) and a possible Bone
-type Pos = (Int, Int)
+-- defining a location as a tuple with two positions (Int, Int) and a possible Bone
+type Loc = (Int, Int)
 
 maxBone :: Int
 maxBone = 6
@@ -56,10 +57,21 @@ interleave x (y:ys) = y : x : interleave x ys
 
 
 
-
-locsBones :: Grid -> [Pos]
+-- determine all location combinations on the grid
+locsBones :: Grid -> [Loc]
 locsBones g = concat [locations (transpose g) 1, locations g (width g)]
 
+locations :: Grid -> Int -> [Loc]
+locations g p2start = zip p1 p2
+                            where
+                                p1 = [0..((width g) * (length g - 1))-1]
+                                p2 = [p2start..]
+
+-- calculating width
+width :: Grid -> Int
+width g = length (head g)
+
+-- determine all possible bones on the grid
 possBones :: Grid -> [Bone]
 possBones g = concat [map orderBone (zips (transpose g)), map orderBone (zips g)]
 
@@ -76,32 +88,34 @@ orderBone :: Bone -> Bone
 orderBone (b1, b2) | b1 <= b2  = (b1, b2)
                    | otherwise = (b2, b1)
 
--- calculating width
-width :: Grid -> Int
-width g = length (head g)
-
-locations :: Grid -> Int -> [Pos]
-locations g p2start = zip p1 p2
-                            where
-                                p1 = [0..((width g) * (length g - 1))-1]
-                                p2 = [p2start..]
 
 
 
 
--- elemIndices (0,0) (allBones startGrid)
+
 -- determine the number of a bone           ORDERING MIGHT BE DONE OUTSIDE
 boneNum :: Bone -> Int
 boneNum (b1, b2) = sum [maxBone+1-b1..maxBone] + b2 + 1
 
+
+
+
+
+
 -- lists the number of occurences with the indices of occurence of all possible bones
-numOccurr :: [Bone] -> [(Int, [Int])]
-numOccurr possBones = zip nums (occurences possBones)
+numOccur :: [Bone] -> [(Int, [Int])]
+numOccur possBones = zip nums (occurences possBones)
                       where
                         nums = [length n | n <- (occurences possBones)]
 
 occurences :: [Bone] -> [[Int]]
 occurences possBones = [elemIndices u possBones | u <- nub possBones]                     
--- [(0,0),(0,3),(0,2),(1,4),(3,4),(6,4),(0,3),(0,2),(1,4)]
--- startBones :: [Bone]
--- startBones = zip [1..] (zip b1 b2)
+
+
+
+
+
+play :: Grid -> IO()
+play g | n == 1    = putStrLn "Er is een unieke"
+       | otherwise = putStrLn "Geen unieke te bekennen"
+         where n = length (head (sort (numOccur (possBones g))))
