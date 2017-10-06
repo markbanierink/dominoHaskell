@@ -101,21 +101,17 @@ boneNum (b1, b2) = sum [maxBone+1-b1..maxBone] + b2 + 1
 
 
 
-
--- lists the number of occurences with the indices of occurence of all possible bones
-numOccur :: [Bone] -> [(Int, [Int])]
-numOccur possBones = zip nums (occurences possBones)
-                      where
-                        nums = [length n | n <- (occurences possBones)]
-
+-- lists the number of occurences of all possible bones
 occurences :: [Bone] -> [[Int]]
-occurences possBones = [elemIndices u possBones | u <- nub possBones]                     
+occurences possBones = [elemIndices u possBones | u <- nub possBones]     
 
+sortLL :: [[Int]] -> [[Int]]
+sortLL list = sortBy (comparing length) list
 
+-- [[1,2,3],[3,4],[3,4,5,6]]
+-- [(0,1),(0,1),(3,4),(5,6)]
 
-
-
-play :: Grid -> IO()
-play g | n == 1    = putStrLn "Er is een unieke"
-       | otherwise = putStrLn "Geen unieke te bekennen"
-         where n = length (head (sort (numOccur (possBones g))))
+play :: Grid -> IO ()
+play g | length indices == 1    = putStrLn ("Er is een unieke op: " ++ show (locsBones g !! head(indices)))
+       | otherwise              = putStrLn "Branchen met die handel"
+         where indices = head (sortLL (occurences (possBones g)))
