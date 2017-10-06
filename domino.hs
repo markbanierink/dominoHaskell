@@ -87,6 +87,7 @@ positions g p2start = zip p1 p2
                                 p2 = [p2start..]
 
 
+                                
 -- elemIndices (_,_,(0,0)) (possBones startGrid)
 -- determine the number of a bone           ORDERING MIGHT BE DONE OUTSIDE
 boneNum :: Bone -> Int
