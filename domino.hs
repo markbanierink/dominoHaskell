@@ -20,7 +20,7 @@ type Grid = [[Int]]
 type Bone = (Int, Int)
 
 -- defining a possible possition as a tuple with two positions (Int, Int) and a possible Bone
-type Pos = (Int, Int, Bone)
+type Pos = (Int, Int)
 
 maxBone :: Int
 maxBone = 6
@@ -57,12 +57,8 @@ interleave x (y:ys) = y : x : interleave x ys
 
 
 
--- determine all possible bones on the grid (horizontal and vertical) and order them low-high
-possBones :: Grid -> [Pos]
-possBones g = concat [positions (map orderBone (zips (transpose g))) 1, positions (map orderBone (zips g)) (width g)]
-
-posses :: Grid -> [(Int, Int)]
-posses g = concat [positions2 (transpose g) 1, positions2 g (width g)]
+posses :: Grid -> [Pos]
+posses g = concat [positions (transpose g) 1, positions g (width g)]
 
 allBones :: Grid -> [Bone]
 allBones g = concat [map orderBone (zips (transpose g)), map orderBone (zips g)]
@@ -84,15 +80,8 @@ orderBone (b1, b2) | b1 <= b2  = (b1, b2)
 width :: Grid -> Int
 width g = length (head g)
 
--- add positions to a bone
-positions :: [Bone] -> Int -> [Pos]
-positions zips p2start = zip3 p1 p2 zips
-                            where
-                                p1 = [0..]
-                                p2 = [p2start..]
-
-positions2 :: Grid -> Int -> [(Int, Int)]
-positions2 g p2start = zip p1 p2
+positions :: Grid -> Int -> [Pos]
+positions g p2start = zip p1 p2
                             where
                                 p1 = [0..((width g) * (length g - 1))-1]
                                 p2 = [p2start..]
