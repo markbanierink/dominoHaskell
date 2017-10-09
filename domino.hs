@@ -63,23 +63,22 @@ chop :: Int -> [Int] -> Grid
 chop n [] = []
 chop n xs = take n xs : chop n (drop n xs)
 
--- determine all location combinations on the grid
-initialLocs :: Grid -> [Loc]
-initialLocs g = concat [locations (transpose g) 1, locations g (width g)]
 
-locations :: Grid -> Int -> [Loc]
-locations g p2start = zip p1 p2
-                            where
-                                p1 = [0..((width g) * (length g - 1))-1]
-                                p2 = [p2start..]
+
+
+
+-- turn initial grid into map of locations and bones
+initial :: Grid -> [Pos]
+initial g = concat [(zip lv bv), (zip lh bh)]
+            where
+              lv = zip [0..] [1..]
+              lh = zip [0..] [(width g)..]
+              bv = map orderBone (zips (transpose g))
+              bh = map orderBone (zips g)
 
 -- calculating width
 width :: Grid -> Int
 width g = length (head g)
-
--- determine all possible bones on the grid
-initialBones :: Grid -> [Bone]
-initialBones g = concat [map orderBone (zips (transpose g)), map orderBone (zips g)]
 
 -- create bone for each vertical neighbour
 zips :: Grid -> [Bone]
@@ -94,9 +93,8 @@ orderBone :: Bone -> Bone
 orderBone (b1, b2) | b1 <= b2  = (b1, b2)
                    | otherwise = (b2, b1)
 
--- turn initial grid into map of locations and bones
-initial :: Grid -> [Pos]
-initial g = zip (initialLocs g) (initialBones g)
+
+
 
 -- determine the number of a bone
 boneNum :: Bone -> Int
@@ -112,21 +110,17 @@ sortByLength :: [[Int]] -> [[Int]]
 sortByLength list = sortBy (comparing length) list
 
 
--- play :: Grid -> IO ()
--- play g | length indices == 1    = putStrLn ("Er is een unieke op: " ++ show (initialLocs g !! head(indices)))
---        | otherwise              = putStrLn "Branchen met die handel"
---          where indices = head (sortByLength (occurences (initialBones g)))
+
+
+
 
 play :: Grid -> IO ()
-play g | length indices == 1    = putStrLn ("Er is een unieke op: " ++ show (initial g !! head(indices)))
-       | otherwise              = putStrLn "Branchen met die handel"
-         where indices = head (sortByLength (occurences (initial g)))
+play g = play' (initial g)
 
-
--- run :: [Pos] -> [Int]
--- run ps = 
-
--- play' :: [Pos] -> [Pos]
+play' :: [Pos] -> IO ()
+play' ps | length indices == 1 = putStrLn ("Er is een unieke op: " ++ show (ps !! head indices))
+         | otherwise           = putStrLn "Branchen met die handel"
+           where indices = head (sortByLength (occurences ps))
 
 -- neighbours can be found by looking for overlapping positions.
 -- if a possible bone has no overlapping positions with other possible bones, it has no neighbours
@@ -138,6 +132,7 @@ play g | length indices == 1    = putStrLn ("Er is een unieke op: " ++ show (ini
 
 -- filteredPossBones :: [Pos] -> Loc -> [Pos]
 -- filteredPossBones ((l1,l2),(b1,b2)) (r1,r2) = filter (possBoneFilter (l1,l2) (r1,r2)) ((l1,l2),(b1,b2))
+-- Filters positions leaving locations given as an argument out
 filteredPossBones :: [Pos] -> Loc -> [Pos]
 filteredPossBones ps r = [p | p <- ps, possBoneFilter p r]
 
