@@ -70,7 +70,7 @@ chop n xs = take n xs : chop n (drop n xs)
 initiate :: Grid -> [Pos]
 initiate g = concat [(zip lv bv), (zip lh bh)]
              where
-              lv = filter (\(x,y) -> (x+1) `mod` 8 /= 0) (zip [0..] [1..])
+              lv = filter (\(x,y) -> (x+1) `mod` (width g) /= 0) (zip [0..] [1..])
               lh = zip [0..] [(width g)..]
               bv = map orderBone (concat [ziph gr | gr <- g])
               bh = map orderBone (zipv g)
@@ -129,8 +129,9 @@ solve ps ss | length ss == numBones boneNums = [ss] -- all bones are placed, so 
             | length oneNeighbour > 0        = solve (locFilter ps (posIndices oneNeighbour)) (concat [ss, oneNeighbour])
             | otherwise                      = [ss] -- branchen!!!   [solve p ss | p <- ]
               where
-                unique       = getPosses ps (uniques (occurences ps))
-                oneNeighbour = posOneNeighbour ps
+                unique       = doubleFilter ss (getPosses ps (uniques (occurences ps)))
+                oneNeighbour = doubleFilter ss (posOneNeighbour ps)
+                
 
 -- -- defining a tree with all possible solutions
 -- data Tree a = Node a [Tree a] deriving Show
@@ -148,9 +149,9 @@ occurences :: [Pos] -> [[Int]]
 occurences ps = [elemIndices u possBones | u <- nub possBones]
                  where possBones = [snd p | p <- ps]
 
--- -- sort a list of lists by length
--- sortByLength :: [[Int]] -> [[Int]]
--- sortByLength list = sortBy (comparing length) list
+-- sort a list of lists by length
+sortByLength :: [[Int]] -> [[Int]]
+sortByLength list = sortBy (comparing length) list
 
 -- get Pos based on the index
 getPosses :: [Pos] -> [Int] -> [Pos]
@@ -185,10 +186,15 @@ locFilter :: [Pos] -> [Int] -> [Pos]
 locFilter ps is = nub (concat [filt ps is])
                   where filt ps i = filter ((\(x,y) -> not (elem x is) && not (elem y is)).fst) ps
 
+-- filters out doubles that are already in the solutions list
+doubleFilter :: [Pos] -> [Pos] -> [Pos]
+doubleFilter ss fs = filter ((`notElem` se) . snd) fs
+                     where se = [snd s | s <- ss]
+
+-- ps' = locFilter ps (posIndices (getPosses ps (uniques (occurences ps))))
+-- ps'' = locFilter ps' (posIndices (posOneNeighbour ps'))
 
 -- posOneNeighbour (locFilter ps (posIndices (getPosses ps (uniques (occurences ps)))))
-
-
 
 -- locFilterPstv :: [Pos] -> [Int] -> [Pos]
 -- locFilterPstv ps is = nub (concat [filt ps i | i <- is])
@@ -239,6 +245,9 @@ createSolutionGrid sol w = chop w [v | (_,v) <- (sortBy (comparing fst) sol)]
 
 
 -- (initial startGrid) !! (head (uniques (occurences (initial startGrid))))
+
+-- fs = [((1,2),(2,3)),((3,4),(5,6)),((4,5),(1,2)),((5,6),(4,5))]
+-- ss = [((1,2),(2,3)),((3,4),(1,6)),((4,5),(1,4)),((5,6),(1,3))]
 
 -- x1 = [((0,1),(6,6)),((2,3),(1,3)),((4,5),(1,3)),((6,7),(0,1)),((8,9),(1,5)),((10,11),(5,5)),((12,13),(0,6))]
 -- x2 = [((14,15),(2,6)),((16,17),(0,2)),((18,19),(2,4)),((20,21),(3,4)),((22,23),(3,6)),((24,25),(0,4)),((26,27),(3,5))]
