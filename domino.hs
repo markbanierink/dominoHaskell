@@ -4,8 +4,6 @@ import Data.List
 import System.IO
 import Data.Ord
 
--- type Pos = (Int, Int)
-
 -- clearing the screen
 cls :: IO ()
 cls = do putStr "\ESC[2J" -- control character for clearing screen
@@ -13,10 +11,6 @@ cls = do putStr "\ESC[2J" -- control character for clearing screen
 -- the goto method (not to be confused with the goto in struct. progr.)
 goto :: (Int, Int) -> IO ()
 goto (x,y) = putStr ("\ESC[" ++ show y ++ ";" ++ show x ++ "H")
-
--- the goto method (not to be confused with the goto in struct. progr.)
--- goto :: Pos -> IO ()
--- goto (x,y) = putStr ("\ESC[" ++ show y ++ ";" ++ show x ++ "H")
 
 -- defining Grid as a list of list of Ints
 type Grid = [[Int]]
@@ -31,7 +25,7 @@ type Bone = (Int, Int)
 type Pos = (Loc, Bone)
 
 -- defining a Solution as a list of combinations of an index and a bone value
-type Sol = [(Int, Int)]
+type Sol = [Pos]
 
 -- the maximum value in the game
 boneNums :: Int
@@ -112,26 +106,37 @@ numBones n = n * (n + 1) `div` 2
 
 
 
-
+-- starting point of the program
 play :: Grid -> IO ()
 play g = do cls
             goto (1,1)
             putGrid g
             play' (initial g) (width g)
 
+-- real start
 play' :: [Pos] -> Int -> IO ()
 play' ps w = printSolutions (solutions2Grids (solve ps []) w)
 
-solve :: [Pos] -> [Sol] -> [Sol]
-solve ps gs | length gs == numBones boneNums = gs
-            | length indices == 1            = solve (filterLocations ps (fst (ps !! head indices))) gs
-            | length neighbour == 1          = solve (filterNeighbours ps (1,1)) gs
-            | otherwise                      = [] -- branchen!!!
+-- logic for solving the puzzle
+solve :: [Pos] -> Sol -> [Sol]
+solve ps ss | length ss == numBones boneNums = [ss] -- all bones are placed, so we're ready
+            | length indices > 0             = solve (locFilter ps (posIndices (getPosses ps indices))) (concat [ss, (getPosses ps indices)])
+            | length oneNeighbour > 0        = solve (locFilter ps oneNeighbour) (concat [ss, locFilter ps oneNeighbour])
+            | otherwise                      = [ss] -- branchen!!!   [solve p ss | p <- ]
               where
-                indices    = uniques (occurences ps)
-                neighbour  = [5]
+                indices       = uniques (occurences ps)
+                oneNeighbour  = occurOnce (posIndices ps)
 
--- lists the number of occurences of all possible bones
+
+-- -- defining a tree with all possible solutions
+-- data Tree a = Node a [Tree a] deriving Show
+
+-- -- we can create this very easily by recursion
+-- gametree :: [Pos] -> [Pos] -> Tree Grid
+-- gametree ps ss = Node ss [gametree ps ss' | ss' <- solve ps ss]
+
+
+-- lists the number of occurences of all possible bones and returns their indices
 occurences :: [Pos] -> [[Int]]
 occurences ps = [elemIndices u possBones | u <- nub possBones]
                  where possBones = [snd p | p <- ps]
@@ -140,25 +145,42 @@ occurences ps = [elemIndices u possBones | u <- nub possBones]
 -- sortByLength :: [[Int]] -> [[Int]]
 -- sortByLength list = sortBy (comparing length) list
 
+-- get Pos based on the index
+getPosses :: [Pos] -> [Int] -> [Pos]
+getPosses ps is = [ps !! i | i <- is]
+
+-- addPosSol :: [Grid] -> [Pos] -> [Grid]
+-- addPosSol gs ps = p | p <- ps
+--                   where g = 
+
 -- search list for uniques
 uniques :: [[Int]] -> [Int]
 uniques occs = [head x | x <- occs, length x == 1]
 
-occurOnce :: [Int] -> [Int]
+
+
+-- finds the locations that only occur once
+occurOnce :: Eq a => [a] -> [a]
 occurOnce xs = [x | x <- xs, count x xs == 1]
 
-count :: Int -> [Int] -> Int
-count x xs =  length (filter (==x) xs)
+count :: Eq a => a -> [a] -> Int
+count x xs = length (filter (==x) xs)
 
-locIndices :: [Pos] -> [Int]
-locIndices ps = concat (map (\(x,y) -> [x,y]) ls)
+-- gives a list of indices of a pos
+posIndices :: [Pos] -> [Int]
+posIndices ps = concat (map (\(x,y) -> [x,y]) ls)
                 where ls = [l | (l,b) <- ps]
 
 -- filters a list of positions with a list of location indices
-indexFilter :: [Pos] -> [Int] -> [Pos]
-indexFilter ps ls = filter ((\(x,y) -> x /= l && y /= l).fst) (indexFilter ps (tail ls))
-                    where l = head ls
+locFilter :: [Pos] -> [Int] -> [Pos]
+locFilter _ []  = []
+locFilter ps ls = filter ((\(x,y) -> x /= l && y /= l).fst) (locFilter ps (tail ls))
+                  where l = head ls
 
+locFilterPstv :: [Pos] -> [Int] -> [Pos]
+locFilterPstv _ []  = []
+locFilterPstv ps ls = filter ((\(x,y) -> x == l || y == l).fst) (locFilterPstv ps (tail ls))
+                      where l = head ls
 -- uni :: [(Int, Int)] -> [Int]
 -- uni (ls,bs) = concat (map (\(x,y) -> [x,y]) ls)
 
@@ -166,23 +188,23 @@ indexFilter ps ls = filter ((\(x,y) -> x /= l && y /= l).fst) (indexFilter ps (t
 -- (initial startGrid) !! (head (uniques (occurences (initial startGrid))))
 
 -- Filters positions leaving locations given as an argument out
-filterLocations :: [Pos] -> Loc -> [Pos]
-filterLocations ps r = [p | p <- ps, locationFilter p r]
+-- filterLocations :: [Pos] -> Loc -> [Pos]
+-- filterLocations ps r = [p | p <- ps, locationFilter p r]
 
-locationFilter :: Pos -> Loc -> Bool
-locationFilter (ls,bs) (r1,r2) = l1 /= r1 && l2 /= r1 && l1 /= r2 && l2 /= r2
-                                 where
-                                    l1 = fst ls
-                                    l2 = snd ls
+-- locationFilter :: Pos -> Loc -> Bool
+-- locationFilter (ls,bs) (r1,r2) = l1 /= r1 && l2 /= r1 && l1 /= r2 && l2 /= r2
+--                                  where
+--                                     l1 = fst ls
+--                                     l2 = snd ls
 
-filterNeighbours :: [Pos] -> Loc -> [Pos]
-filterNeighbours ps r = [p | p <- ps, neighboursFilter p r]
+-- filterNeighbours :: [Pos] -> Loc -> [Pos]
+-- filterNeighbours ps r = [p | p <- ps, neighboursFilter p r]
 
-neighboursFilter :: Pos -> Loc -> Bool
-neighboursFilter (ls,bs) (r1,r2) = l1 /= r1 && l2 /= r1 && l1 /= r2 && l2 /= r2
-                                  where
-                                    l1 = fst ls
-                                    l2 = snd ls
+-- neighboursFilter :: Pos -> Loc -> Bool
+-- neighboursFilter (ls,bs) (r1,r2) = l1 /= r1 && l2 /= r1 && l1 /= r2 && l2 /= r2
+--                                   where
+--                                     l1 = fst ls
+--                                     l2 = snd ls
 
 -- neighboursFilter' :: Pos -> [Int] -> Bool
 -- neighboursFilter' (ls,bs) rs = l1 /= r && l2 /= r
@@ -199,10 +221,16 @@ printSolutions (g:gs) = do putGrid g
                            putStrLn (concat (replicate (4 * width g) "=") ++ "\n")
                            printSolutions gs
 
-solutions2Grids :: [Sol] -> Int -> [Grid]
-solutions2Grids sols w = [(createSolutionGrid s w) | s <- sols]
+solutions2Grids :: [[Pos]] -> Int -> [Grid]
+solutions2Grids sols w = [(createSolutionGrid (pos2sols s) w) | s <- sols]
 
-createSolutionGrid :: Sol -> Int -> Grid
+pos2sols :: [Pos] -> [(Int, Int)]
+pos2sols ps = zip i v
+              where 
+                i = [fst (fst p) | p <- ps]
+                v = [boneNum (snd p) | p <- ps]
+
+createSolutionGrid :: [(Int, Int)] -> Int -> Grid
 createSolutionGrid sol w = chop w [v | (_,v) <- (sortBy (comparing fst) sol)]
 
 
