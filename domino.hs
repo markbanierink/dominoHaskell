@@ -24,8 +24,8 @@ type Bone = (Int, Int)
 -- defining a Position as a combination of a Location and the fitting Bone
 type Pos = (Loc, Bone)
 
--- defining a Solution as a list of combinations of an index and a bone value
-type Sol = [Pos]
+-- defining a resultset as a combination of possible Positions and solution Positions
+type Res = ([Pos], [Pos])
 
 -- the maximum value in the game
 boneNums :: Int
@@ -67,8 +67,8 @@ chop n xs = take n xs : chop n (drop n xs)
 
 
 -- turn initial grid into map of locations and bones
-initiate :: Grid -> [Pos]
-initiate g = concat [(zip lv bv), (zip lh bh)]
+initiate :: Grid -> Res
+initiate g = (concat [(zip lv bv), (zip lh bh)],[])
              where
               lv = filter (\(x,y) -> (x+1) `mod` (width g) /= 0) (zip [0..] [1..])
               lh = zip [0..] [(width g)..]
@@ -89,7 +89,7 @@ zipv g   = concat [row, rest]
 
 -- creating horizontal bones
 ziph :: [Int] -> [(Int, Int)]
-ziph [x] = []
+ziph [_] = []
 ziph (g:gs) = (g, (head gs)) : ziph gs
             
 -- order bone low-high
@@ -109,40 +109,93 @@ numBones n = n * (n + 1) `div` 2
 
 
 
--- starting point of the program
-play :: Grid -> IO ()
-play g = do cls
-            goto (1,1)
-            putGrid g
-            putStrLn "Finding solutions...\n"
-            putStrLn (concat (replicate (4 * width g) "=") ++ "\n")
-            play' (initiate g) (width g)
+-- -- initialising
+-- play :: Grid -> IO ()
+-- play g = do cls
+--             goto (1,1)
+--             putGrid g
+--             putStrLn "Finding solutions...\n"
+--             putStrLn (concat (replicate (4 * width g) "=") ++ "\n")
+--             play' (initiate g) (width g)
 
--- real start
-play' :: [Pos] -> Int -> IO ()
-play' ps w = printSolutions (solutions2Grids (solve ps []) w)
+-- -- start finding solutions
+-- play' :: [Pos] -> Int -> IO ()
+-- play' ps w = printSolutions (solutions2Grids (solve ps []) w)
+
+-- -- logic for solving the puzzle
+-- solve :: [Pos] -> [Pos] -> [[Pos]
+-- solve ps ss | ready ss            = [ss] -- all bones are placed, so we're ready
+--             | hasUniques us       = solve (locFilter ps (posIndices us)) (concat [ss, us])
+--             | hasOneNeighbours ns = solve (locFilter ps (posIndices ns)) (concat [ss, ns])
+--             | otherwise           = [ss] -- [solve (locFilter ps (posIndices t)) (concat [ss, t]) | t <- ts]
+--                where
+--                 us = getPosses ps (uniques (occurences (doubleFilter ss ps)))
+--                 ns = posOneNeighbour (doubleFilter ss ps)
+--                 -- ts = getPosses ps (head (sortByLength (occurences (doubleFilter ss ps))))
+
 
 -- logic for solving the puzzle
-solve :: [Pos] -> Sol -> [Sol]
-solve ps ss | length ss == numBones boneNums = [ss] -- all bones are placed, so we're ready
-            | length unique > 0              = solve (locFilter ps (posIndices unique)) (concat [ss, unique])
-            | length oneNeighbour > 0        = solve (locFilter ps (posIndices oneNeighbour)) (concat [ss, oneNeighbour])
-            | otherwise                      = [ss] -- branchen!!!   [solve p ss | p <- ]
-              where
-                unique       = doubleFilter ss (getPosses ps (uniques (occurences ps)))
-                oneNeighbour = doubleFilter ss (posOneNeighbour ps)
-                
+solve :: Res -> [Res]
+solve (ps,ss) | ready (ps,ss)       = [(ps,ss)] -- all bones are placed, so we're ready
+              | hasUniques us       = solve ((locFilter ps (posIndices us)),(concat [ss, us]))
+              | hasOneNeighbours ns = solve ((locFilter ps (posIndices ns)),(concat [ss, ns]))
+              | otherwise           = [((locFilter ps (posIndices [t])),(concat [ss, [t]])) | t <- ts]
+                where
+                  us = getPosses ps (uniques (occurences (doubleFilter ss ps)))
+                  ns = posOneNeighbour (doubleFilter ss ps)
+                  ts = getPosses ps (head (sortByLength (occurences (doubleFilter ss ps))))
 
--- -- defining a tree with all possible solutions
--- data Tree a = Node a [Tree a] deriving Show
+-- defining a tree with all possible solutions
+data Tree a = Node a [Tree a] deriving Show
 
--- -- we can create this very easily by recursion
--- gametree :: [Pos] -> [Pos] -> Tree Grid
--- gametree ps ss = Node ss [gametree ps ss' | ss' <- solve ps ss]
+-- creating a tree
+resultTree :: Res -> Tree Res
+resultTree sps = Node sps [resultTree sps' | sps' <- solve sps]
 
--- we can create this very easily by recursion
--- gametree :: Grid -> Player -> Tree Grid
--- gametree g p = Node g [gametree g' (next p) | g' <- moves g p]
+-- testing grid
+testGrid :: Grid
+testGrid = [[6,6,2,6,5,2,4,1],
+            [1,3,2,0,1,0,3,4],
+            [1,3,2,4,6,6,5,5],
+            [1,0,4,3,2,1,1,2],
+            [5,1,3,6,0,4,5,5],
+            [5,5,4,0,2,6,0,3],
+            [6,0,5,3,4,2,1,3]]
+
+getResults :: Tree Res -> [Res]
+getResults (Node sps [])             = []
+getResults (Node sps ns) | ready sps = [sps]
+                         | otherwise = concat [getResults n | n <- ns]
+
+-- ps' = locFilter ps (posIndices (getPosses ps (uniques (occurences ps))))
+-- ps'' = locFilter ps' (posIndices (posOneNeighbour ps'))
+
+
+-- minimax :: Tree [Res] -> Tree ([Res], Bool)
+-- minimax (Node sps _) | ready sps  = Node (sps, True) []
+--                      | otherwise  = Node (sps, False) sps'
+--                        where sps' = map minimax sps -- apply minimax to each child
+
+-- play2 :: Grid -> IO ()
+-- play2 g = do cls
+--              goto (1,1)
+--              putGrid g
+--              putStrLn "Finding solutions...\n"
+--              putStrLn (concat (replicate (4 * width g) "=") ++ "\n")
+--              gametree (initiate g) []
+
+
+-- check if ready
+ready :: Res -> Bool
+ready (ps,ss) = length ss == numBones boneNums
+
+-- check if has uniques
+hasUniques :: [Pos] -> Bool
+hasUniques us = length us > 0
+
+-- check if has neighbours
+hasOneNeighbours :: [Pos] -> Bool
+hasOneNeighbours ns = length ns > 0
 
 -- lists the number of occurences of all possible bones and returns their indices
 occurences :: [Pos] -> [[Int]]
@@ -168,11 +221,7 @@ posOneNeighbour ps = nub (concat [filt ps is])
                     is = [x | x <- (posIndices ps), count x (posIndices ps) == 1]
                     filt ps is = filter ((\(x,y) -> ((elem x is) || (elem y is))).fst) ps
 
--- -- finds the locations that only occur once
--- occurOnce :: [Pos] -> [Int]
--- occurOnce ps = [x | x <- xs, count x xs == 1]
---                where xs = posIndices ps
-
+-- count occurences
 count :: Eq a => a -> [a] -> Int
 count x xs = length (filter (==x) xs)
 
@@ -190,6 +239,49 @@ locFilter ps is = nub (concat [filt ps is])
 doubleFilter :: [Pos] -> [Pos] -> [Pos]
 doubleFilter ss fs = filter ((`notElem` se) . snd) fs
                      where se = [snd s | s <- ss]
+
+
+
+printSolutions :: [Grid] -> IO ()
+printSolutions []     = putStrLn "Finished."
+printSolutions (g:gs) = do putGrid g
+                           putStrLn (concat (replicate (4 * width g) "-") ++ "\n")
+                           printSolutions gs
+
+solutions2Grids :: [[Pos]] -> Int -> [Grid]
+solutions2Grids [] w   = []
+solutions2Grids sols w = [(createSolutionGrid (pos2sols s) w) | s <- sols]
+
+pos2sols :: [Pos] -> [(Int, Int)]
+pos2sols ps = zip (calcIndices ps) (calcBones ps)
+
+calcIndices :: [Pos] -> [Int]
+calcIndices []     = []
+calcIndices (p:ps) = fst (fst p) : snd (fst p) : calcIndices ps
+
+calcBones :: [Pos] -> [Int]
+calcBones []     = []
+calcBones (p:ps) = boneNum (snd p) : boneNum (snd p) : calcBones ps
+
+createSolutionGrid :: [(Int, Int)] -> Int -> Grid
+createSolutionGrid sol w = chop w [v | (_,v) <- (sortBy (comparing fst) sol)]
+
+
+
+
+
+
+-- print :: Tree [Pos] -> IO ()
+-- print tree = do putGrid (createGrid tree 8)
+
+-- createGrid :: Tree [Pos] -> Int -> Grid
+-- createGrid tree w = 
+
+
+
+
+
+
 
 -- ps' = locFilter ps (posIndices (getPosses ps (uniques (occurences ps))))
 -- ps'' = locFilter ps' (posIndices (posOneNeighbour ps'))
@@ -220,28 +312,7 @@ doubleFilter ss fs = filter ((`notElem` se) . snd) fs
 
 
 
-printSolutions :: [Grid] -> IO ()
-printSolutions []     = putStrLn "Finished."
-printSolutions (g:gs) = do putGrid g
-                           putStrLn (concat (replicate (4 * width g) "-") ++ "\n")
-                           printSolutions gs
 
-solutions2Grids :: [[Pos]] -> Int -> [Grid]
-solutions2Grids sols w = [(createSolutionGrid (pos2sols s) w) | s <- sols]
-
-pos2sols :: [Pos] -> [(Int, Int)]
-pos2sols ps = zip (calcIndices ps) (calcBones ps)
-
-calcIndices :: [Pos] -> [Int]
-calcIndices []     = []
-calcIndices (p:ps) = fst (fst p) : snd (fst p) : calcIndices ps
-
-calcBones :: [Pos] -> [Int]
-calcBones []     = []
-calcBones (p:ps) = boneNum (snd p) : boneNum (snd p) : calcBones ps
-
-createSolutionGrid :: [(Int, Int)] -> Int -> Grid
-createSolutionGrid sol w = chop w [v | (_,v) <- (sortBy (comparing fst) sol)]
 
 
 -- (initial startGrid) !! (head (uniques (occurences (initial startGrid))))
