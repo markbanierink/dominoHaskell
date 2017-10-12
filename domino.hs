@@ -4,14 +4,6 @@ import Data.List
 import System.IO
 import Data.Ord
 
--- clearing the screen
-cls :: IO ()
-cls = do putStr "\ESC[2J" -- control character for clearing screen
-         
--- the goto method (not to be confused with the goto in struct. progr.)
-goto :: (Int, Int) -> IO ()
-goto (x,y) = putStr ("\ESC[" ++ show y ++ ";" ++ show x ++ "H")
-
 -- defining Grid as a list of list of Ints
 type Grid = [[Int]]
 
@@ -27,27 +19,38 @@ type Pos = (Loc, Bone)
 -- defining a resultset as a combination of possible Positions and solution Positions
 type Res = ([Pos], [Pos])
 
--- the maximum value in the game
-boneNums :: Int
-boneNums = 7
+-- defining a tree with all possible solutions
+data Tree a = Node a [Tree a] deriving Show
+
+-- clearing the screen
+cls :: IO ()
+cls = do putStr "\ESC[2J" -- control character for clearing screen
+         
+-- the goto method (not to be confused with the goto in struct. progr.)
+goto :: (Int, Int) -> IO ()
+goto (x,y) = putStr ("\ESC[" ++ show y ++ ";" ++ show x ++ "H")
 
 -- starting grid
-startGrid :: Grid
-startGrid = [[6,6,2,6,5,2,4,1],
-             [1,3,2,0,1,0,3,4],
-             [1,3,2,4,6,6,5,4],
-             [1,0,4,3,2,1,1,2],
-             [5,1,3,6,0,4,5,5],
-             [5,5,4,0,2,6,0,3],
-             [6,0,5,3,4,2,0,3]]
+grid :: Grid
+grid = [[6,6,2,6,5,2,4,1],
+        [1,3,2,0,1,0,3,4],
+        [1,3,2,4,6,6,5,4],
+        [1,0,4,3,2,1,1,2],
+        [5,1,3,6,0,4,5,5],
+        [5,5,4,0,2,6,0,3],
+        [6,0,5,3,4,2,0,3]]
+
+-- the maximum value in the game
+boneNums :: Int
+boneNums = maximum (maximum grid) + 1
 
 -- showing the grid
 putGrid :: Grid -> IO ()
-putGrid = putStrLn . unlines . concat . map showRow -- unlines joins a list of lines with newlines inbetween
+putGrid = putStrLn . unlines . concat . map showRow
 
 showRow :: [Int] -> [String]
 showRow = beside . map showInt
-            where beside = foldr1 (zipWith (++)) -- foldr1 doesn't accept empty lists, zipwith zips and then applies function to each pair in the list
+            where beside = foldr1 (zipWith (++))
 
 showInt :: Int -> [String]
 showInt i = ["   ", " " ++ sizedInt ++ " ", "   "]
@@ -64,7 +67,7 @@ chop :: Int -> [Int] -> Grid
 chop n [] = []
 chop n xs = take n xs : chop n (drop n xs)
 
--- turn initial grid into map of locations and bones
+-- turn initial grid into a list of locations and bones and a solution list
 initiate :: Grid -> Res
 initiate g = (concat [(zip lv bv), (zip lh bh)],[])
              where
@@ -87,7 +90,7 @@ zipv g   = concat [row, rest]
 
 -- creating horizontal bones
 ziph :: [Int] -> [(Int, Int)]
-ziph [_] = []
+ziph [_]    = []
 ziph (g:gs) = (g, (head gs)) : ziph gs
             
 -- order bone low-high
@@ -103,18 +106,17 @@ boneNum (b1, b2) = sum [boneNums-b1..boneNums-1] + b2 + 1
 numBones :: Int -> Int
 numBones n = n * (n + 1) `div` 2
 
--- initialising
+-- start playing
 play :: Grid -> IO ()
 play g = do cls
             goto (1,1)
+            putStrLn (concat (replicate (4 * width g) "*") ++ "\n")
+            putStrLn "Grid:\n"
             putGrid g
-            putStrLn "Finding solutions...\n"
+            putStrLn (concat (replicate (4 * width g) "*") ++ "\n")
+            putStrLn "Solutions:\n"
             putStrLn (concat (replicate (4 * width g) "=") ++ "\n")
-            play' (initiate g) (width g)
-
--- start finding solutions
-play' :: Res -> Int -> IO ()
-play' ps w = printSolutions (solutions2Grids (getResults (resultTree ps)) w)
+            printSolutions (solutions2Grids (getResults (resultTree (initiate g))) (width g)) 0
 
 -- logic for solving the puzzle
 solve :: Res -> [Res]
@@ -127,17 +129,10 @@ solve (ps,ss) | ready (ps,ss)       = [(ps,ss)] -- all bones are placed, so we'r
                   us = getPosses ps (uniques (occurences ps))
                   ns = posOneNeighbour ps
                   ts = getPosses ps (head (sortByLength (occurences ps)))
-                  -- ts = getPosses db ((sortByLength (occurences db)) !! 0)
-
--- defining a tree with all possible solutions
-data Tree a = Node a [Tree a] deriving Show
 
 -- creating a tree
 resultTree :: Res -> Tree Res
 resultTree sps = Node sps [resultTree sps' | sps' <- solve sps]
-
-tmp :: Tree Res -> [Res]
-tmp (Node sps ns) = solve sps
 
 -- getting the results
 getResults :: Tree Res -> [Res]
@@ -181,7 +176,7 @@ posOneNeighbour ps = nub (concat [filt ps is])
                       filt ps is = filter ((\(x,y) -> ((elem x is) || (elem y is))).fst) ps
 
 -- count occurences
-count :: Eq a => a -> [a] -> Int
+count :: Int -> [Int] -> Int
 count x xs = length (filter (==x) xs)
 
 -- gives a list of indices of positions
@@ -194,17 +189,19 @@ locFilter :: [Pos] -> [Int] -> [Pos]
 locFilter ps is = nub (concat [filt ps is])
                   where filt ps is = filter ((\(x,y) -> not (elem x is) && not (elem y is)).fst) ps
 
-
 -- print all solutions
-printSolutions :: [Grid] -> IO ()
-printSolutions []     = putStrLn "Finished."
-printSolutions (g:gs) = do putGrid g
-                           putStrLn (concat (replicate (4 * width g) "-") ++ "\n")
-                           printSolutions gs
+printSolutions :: [Grid] -> Int -> IO ()
+printSolutions [] i     = putStrLn ("Finished with " ++ show i ++ " solutions.\n")
+printSolutions (g:gs) i = do putGrid g
+                             putStrLn (concat (replicate (4 * width g) "-") ++ "\n")
+                             printSolutions gs (i+1)
 
 solutions2Grids :: [Res] -> Int -> [Grid]
 solutions2Grids [] w   = []
 solutions2Grids sols w = [(createSolutionGrid (pos2sols (snd s)) w) | s <- sols]
+
+createSolutionGrid :: [(Int, Int)] -> Int -> Grid
+createSolutionGrid sol w = chop w [v | (_,v) <- (sortBy (comparing fst) sol)]
 
 pos2sols :: [Pos] -> [(Int, Int)]
 pos2sols ps = zip (calcIndices ps) (calcBones ps)
@@ -216,6 +213,3 @@ calcIndices (p:ps) = fst (fst p) : snd (fst p) : calcIndices ps
 calcBones :: [Pos] -> [Int]
 calcBones []     = []
 calcBones (p:ps) = boneNum (snd p) : boneNum (snd p) : calcBones ps
-
-createSolutionGrid :: [(Int, Int)] -> Int -> Grid
-createSolutionGrid sol w = chop w [v | (_,v) <- (sortBy (comparing fst) sol)]
