@@ -48,19 +48,16 @@ boneNums = maximum (maximum grid) + 1
 putGrid :: Grid -> IO ()
 putGrid = putStrLn . unlines . concat . map showRow
 
+-- show a row
 showRow :: [Int] -> [String]
 showRow = beside . map showInt
             where beside = foldr1 (zipWith (++))
 
+-- show an Int
 showInt :: Int -> [String]
 showInt i = ["   ", " " ++ sizedInt ++ " ", "   "]
             where sizedInt | i < 10    = " " ++ show i
                            | otherwise = show i
-
-interleave :: a -> [a] -> [a]
-interleave x []     = []
-interleave x [y]    = [y]
-interleave x (y:ys) = y : x : interleave x ys
 
 -- chop List of Ints into Grid
 chop :: Int -> [Int] -> Grid
@@ -196,20 +193,25 @@ printSolutions (g:gs) i = do putGrid g
                              putStrLn (concat (replicate (4 * width g) "-") ++ "\n")
                              printSolutions gs (i+1)
 
+-- transform a list of Results to a list of Grids
 solutions2Grids :: [Res] -> Int -> [Grid]
 solutions2Grids [] w   = []
 solutions2Grids sols w = [(createSolutionGrid (pos2sols (snd s)) w) | s <- sols]
 
+-- create a Grid from a list with solutions
 createSolutionGrid :: [(Int, Int)] -> Int -> Grid
 createSolutionGrid sol w = chop w [v | (_,v) <- (sortBy (comparing fst) sol)]
 
+-- translate Pos to a solution list containing an index and a bone number
 pos2sols :: [Pos] -> [(Int, Int)]
 pos2sols ps = zip (calcIndices ps) (calcBones ps)
 
+-- calculating indices of a Pos
 calcIndices :: [Pos] -> [Int]
 calcIndices []     = []
 calcIndices (p:ps) = fst (fst p) : snd (fst p) : calcIndices ps
 
+-- calculating number of a Pos
 calcBones :: [Pos] -> [Int]
 calcBones []     = []
 calcBones (p:ps) = boneNum (snd p) : boneNum (snd p) : calcBones ps
