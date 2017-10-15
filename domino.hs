@@ -123,9 +123,9 @@ solve (ps,ss) | ready (ps,ss)       = [(ps,ss)] -- all bones are placed, so we'r
               | not (null ns)       = solve ((locFilter (doubleFilter (ps,(concat [ss,ns]))) (posIndices ns)),(concat [ss,ns]))
               | otherwise           = [((locFilter (doubleFilter (ps,(concat [ss,[t]]))) (posIndices [t])),(concat [ss,[t]])) | t <- ts]
                 where
-                  us = getPosses ps (uniques (occurences ps))
+                  us = getPosses ps (uniques (occurrences ps))
                   ns = posOneNeighbour ps
-                  ts = getPosses ps (head (sortByLength (occurences ps)))
+                  ts = getPosses ps (head (sortByLength (occurrences ps)))
 
 -- creating a tree
 resultTree :: Res -> Tree Res
@@ -148,9 +148,9 @@ doubleFilter :: Res -> [Pos]
 doubleFilter (ps,ss) = filter ((`notElem` se) . snd) ps
                        where se = [snd s | s <- ss]
 
--- lists the number of occurences of all possible bones and returns their indices
-occurences :: [Pos] -> [[Int]]
-occurences ps = [elemIndices u possBones | u <- nub possBones]
+-- lists the number of occurrences of all possible bones and returns their indices
+occurrences :: [Pos] -> [[Int]]
+occurrences ps = [elemIndices u possBones | u <- nub possBones]
                 where possBones = [snd p | p <- ps]
 
 -- sort a list of lists by length
@@ -172,7 +172,7 @@ posOneNeighbour ps = nub (concat [filt ps is])
                       is = [x | x <- (posIndices ps), count x (posIndices ps) == 1]
                       filt ps is = filter ((\(x,y) -> ((elem x is) || (elem y is))).fst) ps
 
--- count occurences
+-- count occurrences
 count :: Int -> [Int] -> Int
 count x xs = length (filter (==x) xs)
 
